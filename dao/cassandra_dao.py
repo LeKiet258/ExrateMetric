@@ -84,7 +84,7 @@ def get_latest_bank_info(bank: str) -> pd.DataFrame:
     cluster = None
     session = None
     now = datetime.now().strftime("%Y-%m-%d 00:00:00")
-    columns = globals.list_currency
+    columns = list(globals.list_currency)
     columns.extend(['bank', 'deal_type', 'instrument_type', 'last_updated'])
     query = f"SELECT {','.join(columns)} from exrate where bank = '{bank}' and last_updated >= '{now}' ALLOW FILTERING"
     
@@ -101,6 +101,7 @@ def get_latest_bank_info(bank: str) -> pd.DataFrame:
         if rows:
             df = pd.DataFrame(rows)
             df = df.sort_values(by='last_updated', ascending=False).iloc[:4]
+            df['last_updated'] = pd.to_datetime(df['last_updated']).dt.tz_localize('UTC').dt.tz_convert('Asia/Ho_Chi_Minh')
 
             return df
 
