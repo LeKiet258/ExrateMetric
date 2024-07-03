@@ -1,3 +1,4 @@
+import pytz
 from cassandra.cluster import Cluster
 from cassandra.auth import PlainTextAuthProvider
 from cassandra.query import BatchStatement, ConsistencyLevel
@@ -52,10 +53,10 @@ def batch_insert(df_record: pd.DataFrame):
     session.shutdown()
     cluster.shutdown()
     
-def get_oldest_last_updated(bank: str) -> datetime:
+def get_oldest_created_time(bank: str, is_utc = False) -> datetime:
     cluster = None
     session = None
-    query = f"SELECT min(last_updated) from exrate where bank = '{bank}' ALLOW FILTERING"
+    query = f"SELECT min(created_time) from exrate where bank = '{bank}' ALLOW FILTERING"
     
     try: 
         # Connect to the cluster
@@ -66,6 +67,13 @@ def get_oldest_last_updated(bank: str) -> datetime:
         
         result = session.execute(query, timeout=None)
         min_last_updated = result.one()[0]
+        
+        if not is_utc:
+            utc_min_last_updated = min_last_updated.replace(tzinfo=pytz.utc)
+            ho_chi_minh_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+
+            # Convert the datetime object to Ho Chi Minh timezone
+            min_last_updated = utc_min_last_updated.astimezone(ho_chi_minh_tz)
         
         return min_last_updated # None if bank is not found
     
@@ -120,7 +128,7 @@ def get_latest_bank_info(bank: str) -> pd.DataFrame:
     
 # instructions for running the file: python -m dao.cassandra_dao
 if __name__ == "__main__":
-    print(get_latest_bank_info('vietcombank'))
+    print(get_oldest_created_time('techcombank'))
 
     # get_oldest_last_updated('vietccombank')
     
