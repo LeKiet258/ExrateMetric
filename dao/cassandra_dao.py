@@ -5,6 +5,8 @@ from cassandra.query import BatchStatement, ConsistencyLevel
 from datetime import datetime
 import pandas as pd
 import time
+import logging
+from pathlib import Path
 
 from globals import globals
 
@@ -14,6 +16,11 @@ password = globals.password
 contact_points = globals.contact_points
 port = globals.port
 auth_provider = PlainTextAuthProvider(username, password)
+
+# Set up the logger
+loggerName = Path(__file__).stem
+logger = logging.getLogger(loggerName)
+logging.basicConfig(filename=f'log/{datetime.now().strftime("%Y-%m-%d-%H")}.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
 def batch_insert(df_record: pd.DataFrame):
@@ -56,7 +63,9 @@ def batch_insert(df_record: pd.DataFrame):
 def get_oldest_created_time(bank: str, is_utc = False) -> datetime:
     cluster = None
     session = None
+    method_name = 'get_oldest_created_time'
     query = f"SELECT min(created_time) from exrate where bank = '{bank}' ALLOW FILTERING"
+    t0 = time.time()
     
     try: 
         # Connect to the cluster
@@ -68,6 +77,8 @@ def get_oldest_created_time(bank: str, is_utc = False) -> datetime:
         result = session.execute(query, timeout=None)
         min_last_updated = result.one()[0]
         
+        logger.info(f"{method_name} - execTime: {int((time.time() - t0) * 1000)} ms. SQL: {query}")
+        
         if not is_utc:
             utc_min_last_updated = min_last_updated.replace(tzinfo=pytz.utc)
             ho_chi_minh_tz = pytz.timezone('Asia/Ho_Chi_Minh')
@@ -78,7 +89,7 @@ def get_oldest_created_time(bank: str, is_utc = False) -> datetime:
         return min_last_updated # None if bank is not found
     
     except Exception as e:
-        print('get_oldest_last_updated - error: {}, sql: {}'.format(e, query))
+        logger.exception(f"Error get_oldest_last_updated, sql: {query}")
         return None
     
     finally:
@@ -104,7 +115,8 @@ def get_latest_bank_info(bank: str) -> pd.DataFrame:
         
         t0 = time.time()
         rows = session.execute(query, timeout=None)
-        print(f"{method_name} - execTime: {int((time.time() - t0) * 1000)} ms. SQL: {query}")
+        
+        logger.info(f"{method_name} - execTime: {int((time.time() - t0) * 1000)} ms. SQL: {query}")
         
         if rows:
             df = pd.DataFrame(rows)
@@ -116,7 +128,7 @@ def get_latest_bank_info(bank: str) -> pd.DataFrame:
         return None
     
     except Exception as e:
-        print('{} - error: {}, sql: {}'.format(method_name, e, query))
+        logger.exception(f'Error {method_name}, sql: {query}')
         return None
     
     finally:

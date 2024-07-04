@@ -4,3 +4,6 @@ doc/
 
 # sensitive content
 conf/
+
+log/
+test2/
