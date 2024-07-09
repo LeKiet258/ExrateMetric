@@ -98,20 +98,22 @@ def get_oldest_created_time(bank: str, is_utc = False) -> datetime:
         if (cluster):
             cluster.shutdown()
 
-def get_latest_bank_info(bank: str) -> pd.DataFrame:
+# TODO: change this to check if row at datetime exists in database
+def get_latest_bank_info(bank: str, n_rows_to_check: int = 4) -> pd.DataFrame:
     method_name = 'get_latest_bank_info'
     cluster = None
     session = None
     now = datetime.now().strftime("%Y-%m-%d 00:00:00")
     columns = list(globals.list_currency)
     columns.extend(['bank', 'deal_type', 'instrument_type', 'last_updated'])
-    query = f"SELECT {','.join(columns)} from exrate where bank = '{bank}' and last_updated >= '{now}' ALLOW FILTERING"
+    
+    query = f"SELECT {','.join(columns)} from exrate where bank = '{bank}' and deal_type in ('buy', 'sell') and instrument_type in ('transfer', 'cash') order by last_updated desc LIMIT {n_rows_to_check} ALLOW FILTERING"
     
     try: 
         # Connect to the cluster
         cluster = Cluster(contact_points, port=port, auth_provider=auth_provider)
         session = cluster.connect(keyspace)
-        session.default_fetch_size = None
+        session.default_fetch_size = None # Disable paging by setting fetch_size to None
         
         t0 = time.time()
         rows = session.execute(query, timeout=None)
@@ -120,7 +122,7 @@ def get_latest_bank_info(bank: str) -> pd.DataFrame:
         
         if rows:
             df = pd.DataFrame(rows)
-            df = df.sort_values(by='last_updated', ascending=False).iloc[:4]
+            # df = df.sort_values(by='last_updated', ascending=False)#.iloc[:n_rows_to_check]
             df['last_updated'] = pd.to_datetime(df['last_updated']).dt.tz_localize('UTC').dt.tz_convert('Asia/Ho_Chi_Minh')
 
             return df
@@ -140,7 +142,7 @@ def get_latest_bank_info(bank: str) -> pd.DataFrame:
     
 # instructions for running the file: python -m dao.cassandra_dao
 if __name__ == "__main__":
-    print(get_oldest_created_time('techcombank'))
+    print(get_latest_bank_info('techcombank',5))
 
     # get_oldest_last_updated('vietccombank')
     

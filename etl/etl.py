@@ -36,7 +36,7 @@ logging.basicConfig(filename=f'log/{datetime.now().strftime("%Y-%m-%d-%H")}.log'
 def get_techcombank_exrate(date:str):
     # EXTRACT
     exrate_url = url_routing('techcombank', dict(date = date))
-    print(f'exrate_url: {exrate_url}')
+    # print(f'exrate_url: {exrate_url}')
     
     if (not exrate_url):
         logger.error('Error getting url for techcombank')
@@ -61,12 +61,10 @@ def get_techcombank_exrate(date:str):
     df_daily_acc = None
     
     if ':' in date:
-        # time_part = date[date.find(' ') + 1:]
         date_part, time_part = date.split(' ')
 
     # recursion
     if time_part == '00:00:00':
-        print(f'list_updated_times: {list_updated_times}')
         time_part = list_updated_times[0]
 
         for i in range(1, len(list_updated_times)):
@@ -74,7 +72,6 @@ def get_techcombank_exrate(date:str):
             df_exrate_by_time = get_techcombank_exrate(full_date_time)
 
             if df_daily_acc is not None:
-                # df_daily_acc = df_daily_acc.union(df_exrate_by_time)
                 df_daily_acc = pd.concat([df_daily_acc, df_exrate_by_time], axis=0, ignore_index=True)
             elif not df_exrate_by_time.empty:
                 df_daily_acc = df_exrate_by_time.copy()
@@ -173,7 +170,8 @@ def get_vietcombank_exrate(date: str):
 
 def is_exrate_cassandra_latest(df_exrate):
     bank = df_exrate['bank'][0]
-    df_latest_exrate_bank = cassandra_dao.get_latest_bank_info(bank)
+    df_exrate = df_exrate.sort_values(by='last_updated', ascending=False) # sort by last_updated desc
+    df_latest_exrate_bank = cassandra_dao.get_latest_bank_info(bank, df_exrate.shape[0])
     
     if (df_latest_exrate_bank is None):
         return False
@@ -202,12 +200,14 @@ def etl_exchange_rate(bank: str, date: str):
     
     try:
         logger.info(f'----Start extracting & transforming data of bank {bank}----')  
+        
         if (bank == 'vietcombank'):
             df_exrate = get_vietcombank_exrate(date)
         elif bank == 'techcombank':
             df_exrate = get_techcombank_exrate(date)
         else:
             return False
+        
         
         # CDC: compare with latest bank info to check if the incoming data is new 
         if (not is_exrate_cassandra_latest(df_exrate)):
@@ -254,8 +254,11 @@ def etl_exchange_rate(bank: str, date: str):
 # instructions for running the file: python -m etl.etl_history
 if __name__ == '__main__':
     now = datetime.now().strftime("%Y-%m-%d") #+ " " + "16:02:01"
-    print(get_techcombank_exrate('2024-07-04'))
-    # print(etl_exchange_rate('techcombank', now))
+    # print(get_techcombank_exrate(now))
+    etl_exchange_rate('vietcombank', now)
+    
+    # df = get_techcombank_exrate(now)
+    # df.to_csv('test.csv', index=False)
     
     # logger.debug("This is a debug message.")
     # logger.info("This is an info message.")

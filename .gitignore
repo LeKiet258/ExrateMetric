@@ -7,3 +7,5 @@ conf/
 
 log/
 test2/
+
+/test/*.csv

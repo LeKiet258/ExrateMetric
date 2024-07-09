@@ -13,29 +13,28 @@ logger = logging.getLogger(loggerName)
 logging.basicConfig(filename=f'log/{datetime.now().strftime("%Y-%m-%d-%H")}.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 
-def etl_history_vietcombank():
+def etl_history_pipeline(bank):
+    current_date = None
+
     try:
         # get exrate from oldest date in cassandra to the past
-        oldest_date_cassandra = cassandra_dao.get_oldest_created_time('vietcombank')
+        oldest_date_cassandra = cassandra_dao.get_oldest_created_time(bank)
         start_date_str = oldest_date_cassandra.strftime("%Y-%m-%d")
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
         
         current_date = start_date
-        status = True
-        while status:
-            logger.info('===Getting {} exchange rate date {}==='.format('vietcombank', current_date.strftime('%Y-%m-%d')))
-            status = etl.etl_exchange_rate('vietcombank', current_date.strftime('%Y-%m-%d'))
+        etl_status = True
+        while etl_status:
+            logger.info('===Getting {} exchange rate date {}==='.format(bank, current_date.strftime('%Y-%m-%d')))
+            etl_status = etl.etl_exchange_rate(bank, current_date.strftime('%Y-%m-%d'))
             
-            # Decrement the current date by one day
             current_date -= timedelta(days=1)
 
             if current_date < datetime(2024, 7, 1):
                 break
         
-        print(1)
-            
     except Exception as e:
-        print(f"Exception in func1: {e}")
+        logger.exception('Error running etl history pipeline for vietcombank, current date: {}'.format(current_date))
 
 def func2():
     try:
@@ -48,7 +47,7 @@ def func2():
 
 
 if __name__ == "__main__":
-    etl_history_vietcombank()
+    etl_history_pipeline()
 
     # Run functions in parallel
     # with concurrent.futures.ThreadPoolExecutor() as executor:
