@@ -12,6 +12,8 @@ loggerName = Path(__file__).stem
 logger = logging.getLogger(loggerName)
 logging.basicConfig(filename=f'log/{datetime.now().strftime("%Y-%m-%d-%H")}.log', level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
+logger.setLevel(logging.DEBUG)  # Set the logging level
+
 
 def etl_history_pipeline(bank):
     current_date = None
@@ -24,30 +26,39 @@ def etl_history_pipeline(bank):
         
         current_date = start_date
         etl_status = True
-        while etl_status:
-            logger.info('===Getting {} exchange rate date {}==='.format(bank, current_date.strftime('%Y-%m-%d')))
-            etl_status = etl.etl_exchange_rate(bank, current_date.strftime('%Y-%m-%d'))
+        map_failed_etl_info = []
+
+        while current_date >= datetime(2018, 1, 1):
+            current_date_fmt =  current_date.strftime('%Y-%m-%d')
+            
+            logger.info('===Getting {} exchange rate date {}==='.format(bank, current_date_fmt))
+            etl_status = etl.etl_exchange_rate(bank, current_date_fmt)
+            
+            if not etl_status:
+                map_failed_etl_info.append({'bank': bank, 'date': current_date_fmt})
             
             current_date -= timedelta(days=1)
 
-            if current_date < datetime(2024, 7, 1):
-                break
+        if map_failed_etl_info: # if not empty
+            logger.error('Failed ETL for the following dates: {}'.format(map_failed_etl_info))
+
+        return etl_status
         
     except Exception as e:
         logger.exception('Error running etl history pipeline for vietcombank, current date: {}'.format(current_date))
 
-def func2():
-    try:
-        print("Starting func2")
-        time.sleep(4)  # Simulate a long-running task
-        print("func2 completed successfully")
-    except Exception as e:
-        print(f"Exception in func2: {e}")
 
 
 
 if __name__ == "__main__":
-    etl_history_pipeline()
+    # etl_history_pipeline()
+    # List of strings
+    banks = ["vietcombank", "techcombank"]
+
+    # Create a ThreadPoolExecutor
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        # Map the function to the list of items
+        results = list(executor.map(etl_history_pipeline, banks))
 
     # Run functions in parallel
     # with concurrent.futures.ThreadPoolExecutor() as executor:

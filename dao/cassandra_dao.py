@@ -74,8 +74,8 @@ def get_oldest_created_time(bank: str, is_utc = False) -> datetime:
 
         session.default_fetch_size = None
         
-        result = session.execute(query, timeout=None)
-        min_last_updated = result.one()[0]
+        rows = session.execute(query, timeout=None)
+        min_last_updated = rows.one()[0]
         
         logger.info(f"{method_name} - execTime: {int((time.time() - t0) * 1000)} ms. SQL: {query}")
         
@@ -103,11 +103,12 @@ def get_latest_bank_info(bank: str, n_rows_to_check: int = 4) -> pd.DataFrame:
     method_name = 'get_latest_bank_info'
     cluster = None
     session = None
-    now = datetime.now().strftime("%Y-%m-%d 00:00:00")
+    ts_column = 'created_time'
     columns = list(globals.list_currency)
-    columns.extend(['bank', 'deal_type', 'instrument_type', 'last_updated'])
+    columns.extend(['bank', 'deal_type', 'instrument_type', ts_column])
     
-    query = f"SELECT {','.join(columns)} from exrate where bank = '{bank}' and deal_type in ('buy', 'sell') and instrument_type in ('transfer', 'cash') order by last_updated desc LIMIT {n_rows_to_check} ALLOW FILTERING"
+    # query = f"SELECT {','.join(columns)} from exrate where bank = '{bank}' and deal_type in ('buy', 'sell') and instrument_type in ('transfer', 'cash') order by last_updated desc LIMIT {n_rows_to_check} ALLOW FILTERING"
+    query = f"SELECT {','.join(columns)} from exrate where bank = '{bank}' ALLOW FILTERING"
     
     try: 
         # Connect to the cluster
@@ -122,8 +123,8 @@ def get_latest_bank_info(bank: str, n_rows_to_check: int = 4) -> pd.DataFrame:
         
         if rows:
             df = pd.DataFrame(rows)
-            # df = df.sort_values(by='last_updated', ascending=False)#.iloc[:n_rows_to_check]
-            df['last_updated'] = pd.to_datetime(df['last_updated']).dt.tz_localize('UTC').dt.tz_convert('Asia/Ho_Chi_Minh')
+            df = df.sort_values(by=ts_column, ascending=False).iloc[:n_rows_to_check]
+            df[ts_column] = pd.to_datetime(df[ts_column]).dt.tz_localize('UTC').dt.tz_convert('Asia/Ho_Chi_Minh')
 
             return df
 
@@ -142,7 +143,7 @@ def get_latest_bank_info(bank: str, n_rows_to_check: int = 4) -> pd.DataFrame:
     
 # instructions for running the file: python -m dao.cassandra_dao
 if __name__ == "__main__":
-    print(get_latest_bank_info('techcombank',5))
+    print(get_latest_bank_info('vietcombank',5))
 
     # get_oldest_last_updated('vietccombank')
     

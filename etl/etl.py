@@ -231,13 +231,12 @@ def etl_exchange_rate(bank: str, date: str):
                 
             # check if the sink is success
             time.sleep(1) # Sleep for 3 seconds
-            status = "sink SUCCESSFULLY"
+            is_sink_success = is_exrate_cassandra_latest(df_exrate)
+            logger.info(f'----Kafka is sink successfully: {is_sink_success}----')
             
-            if not is_exrate_cassandra_latest(df_exrate):
-                status = "sink FAILED"
+            if not is_sink_success:
+                return False
 
-            logger.info(f'----Kafka sink status: {status}----')
-                
         else:
             logger.info(f'----Data is already exist in Cassandra, bank: {bank}, date: {date}----')  
             return False
@@ -255,7 +254,7 @@ def etl_exchange_rate(bank: str, date: str):
 if __name__ == '__main__':
     now = datetime.now().strftime("%Y-%m-%d") #+ " " + "16:02:01"
     # print(get_techcombank_exrate(now))
-    etl_exchange_rate('vietcombank', now)
+    etl_exchange_rate('techcombank', now)
     
     # df = get_techcombank_exrate(now)
     # df.to_csv('test.csv', index=False)
